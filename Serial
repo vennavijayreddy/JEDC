@@ -1,0 +1,362 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Windows.Forms;
+using System.IO.Ports;
+using System.Windows.Threading;
+using System.IO;
+
+namespace JEDC
+{
+    public partial class JEDC : Form
+    {
+        private delegate void UpdateUiTextDelegate(string text);
+        bool file_flag=false;
+        StreamWriter TempWriter;
+        StreamWriter LOGWriter;
+        string appPath;
+        public JEDC()
+        {
+            InitializeComponent();
+        }
+
+        private void JEDC_Load(object sender, EventArgs e)
+        {
+            string[] ports = SerialPort.GetPortNames();
+            foreach (string port in ports)
+            {
+                comboBox1.Items.Add(port);
+            }
+            appPath = Path.GetDirectoryName(Application.ExecutablePath);
+            TempWriter = new StreamWriter(appPath + "\\tempzxc.txt");
+            LOGWriter = new StreamWriter(appPath + "\\LOG_Temp.txt");
+        }
+
+        private void WRITE_Click(object sender, EventArgs e)
+        {
+            char[] wrbuff = new char[100];
+            wrbuff[0] = 'w';
+            serialPort1.Write(wrbuff, 0, 1);
+            System.Threading.Thread.Sleep(10);
+
+            string TX_Addr = System.Convert.ToString(StADDr.Text);
+            serialPort1.Write(TX_Addr);
+            System.Threading.Thread.Sleep(10);
+            wrbuff[0] = System.Convert.ToChar(27);
+            serialPort1.Write(wrbuff, 0, 1);
+
+
+
+            string Data = System.Convert.ToString(DataBox.Text);
+            serialPort1.Write(Data);
+            System.Threading.Thread.Sleep(10);
+            wrbuff[0] = System.Convert.ToChar(27);
+            serialPort1.Write(wrbuff, 0, 1);
+
+
+        }
+
+        private void connectToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            serialPort1.PortName = comboBox1.Text;
+            serialPort1.BaudRate = 115200;
+            serialPort1.StopBits = System.IO.Ports.StopBits.One;
+            try
+            {
+                serialPort1.Open();
+                // serialPort1.ReadTimeout = 5000;
+                serialPort1.DataReceived += new SerialDataReceivedEventHandler(Receive);
+                serialPort1.Parity = System.IO.Ports.Parity.None;
+                MessageBox.Show("COM Port Connected");
+                /* if (B1.Checked == true)
+                     serialPort1.BaudRate = 9600;
+                 else if (B2.Checked == true)
+                     serialPort1.BaudRate = 19200;
+                 else if (B3.Checked == true)
+                     serialPort1.BaudRate = 115200;
+
+                 if (S1.Checked == true)
+                     serialPort1.StopBits = System.IO.Ports.StopBits.One;
+
+                 else if (S2.Checked == true)
+                     serialPort1.StopBits = System.IO.Ports.StopBits.OnePointFive;
+
+                 else if (S3.Checked == true)
+                     serialPort1.StopBits = System.IO.Ports.StopBits.Two;
+
+                 if (P1.Checked == true)
+                     serialPort1.Parity = System.IO.Ports.Parity.Odd;
+
+                 else if (P2.Checked == true)
+                     serialPort1.Parity = System.IO.Ports.Parity.Even;
+
+                 else if (P3.Checked == true)
+                     serialPort1.Parity = System.IO.Ports.Parity.None;
+                  */
+            }
+            catch
+            {
+                 MessageBox.Show("Can not Open Selected COM Port");
+            }
+
+        }
+
+        private void Receive(object sender, System.IO.Ports.SerialDataReceivedEventArgs e)
+        {
+            string RxString = "";
+            string[] data = new string[100];
+            int temp;
+
+            if (!file_flag)
+            {
+                RxString = serialPort1.ReadExisting();
+                LOGWriter.Write(RxString);
+            }
+            else
+            {
+                RxString = serialPort1.ReadExisting();
+                LOGWriter.Write(RxString);
+                TempWriter.Write(RxString);
+            }
+            
+            BeginInvoke(new UpdateUiTextDelegate(DisplayText), new object[] { RxString });
+        }
+
+        private void DisplayText(string RxString)
+        {
+            if (REC_BOX.InvokeRequired)
+            {
+                REC_BOX.Invoke(
+                    new UpdateUiTextDelegate(DisplayText),
+                    new object[] { RxString }
+                );
+                return;
+            }
+            else
+            {
+                REC_BOX.Text = REC_BOX.Text + RxString;
+                System.Windows.Forms.Application.DoEvents();
+            }
+        }
+
+        private void LOAD_Click(object sender, EventArgs e)
+        {
+            int i = 0;
+            char[] wrbuff = new char[10];
+            openFileDialog1.ShowDialog();
+            string FileName = openFileDialog1.FileName;
+
+            wrbuff[0] = 'a';
+            serialPort1.Write(wrbuff, 0, 1);
+
+            
+
+            StreamReader reader = new StreamReader(FileName);
+            string[] data = new string[100];
+            while (!reader.EndOfStream)
+            {
+                data[i] = reader.ReadLine();
+                //SEND_BOX.Text = SEND_BOX.Text + data[i] + "\n";
+                //TxFileData = TxFileData + data[i];
+                if (data[i]!="$")
+                serialPort1.WriteLine(data[i]);
+                else
+                    serialPort1.Write(data[i]);
+                i++;
+            }
+        }
+
+        private void SAVE_Click(object sender, EventArgs e)
+        {
+            string[] data = new string[100];
+            char[] wrbuff = new char[10];
+            wrbuff[0] = 'b';
+            serialPort1.Write(wrbuff, 0, 1);
+            System.Threading.Thread.Sleep(10);
+
+            serialPort1.Write(System.Convert.ToString(StADDr.Text));
+
+            System.Threading.Thread.Sleep(10);
+            wrbuff[0] = System.Convert.ToChar(27);
+            serialPort1.Write(wrbuff, 0, 1);
+
+            serialPort1.Write(System.Convert.ToString(StopADDr.Text));
+            System.Threading.Thread.Sleep(10);
+            wrbuff[0] = System.Convert.ToChar(27);
+            serialPort1.Write(wrbuff, 0, 1);
+
+            file_flag = true;
+
+            System.Threading.Thread.Sleep(5000);
+            TempWriter.Close();
+     
+            saveFileDialog1.FileName = "ENTER FILE NAME";
+            saveFileDialog1.Filter = "Text files (*.txt)|*.txt|All files (*.*)|*.*";
+            saveFileDialog1.ShowDialog();
+            string File_Name = saveFileDialog1.FileName;
+            System.IO.FileStream fs = (System.IO.FileStream)saveFileDialog1.OpenFile();
+            fs.Close();
+            file_flag = false;
+            StreamWriter writer = new StreamWriter(File_Name);
+            StreamReader reader = new StreamReader(appPath + "\\tempzxc.txt");
+            
+          //  while (!reader.EndOfStream)
+           // {
+           //     writer.WriteLine(reader.ReadLine());
+           // }
+            char[] f = new char[200];
+            char[] f2 = new char[200];
+            reader.ReadLine();
+            reader.ReadLine();
+            reader.ReadLine();
+            string temp1 = reader.ReadLine();
+            string temp2 = "";
+            string temp3 = "";
+            int t, i;
+            long t1;
+            while (temp1 != "#" && temp1 != "")
+            {
+                if (temp1 != "#" && temp1 != "")
+            {
+                f = temp1.ToCharArray(11, 8);
+                int len=temp1.Length;
+                f2 = temp1.ToCharArray(30, len-30);
+                for (i = 0; i < 8; i++)
+                {
+                    temp2 = temp2 + System.Convert.ToString(f[i]);
+                   
+                }
+                for (i = 0; i < (len - 30); i++)
+                temp3 = temp3 + System.Convert.ToString(f2[i]);
+                //temp2 = f.ToString();
+                t = System.Convert.ToInt32(temp2, 16);
+                t1 = System.Convert.ToInt64(temp3, 16);
+                temp1 = System.Convert.ToString(t, 16);
+                temp1 = temp1 + " " + System.Convert.ToString(t1, 16);
+            }
+                     writer.WriteLine(temp1);
+                     temp1 = reader.ReadLine();
+                     temp3 = "";
+                     temp2 = "";
+                 
+        }
+            writer.WriteLine("$");
+            writer.Close();
+            reader.Close();
+
+             TempWriter.Dispose();
+             reader.Dispose();
+            TempWriter = null;
+            TempWriter = new StreamWriter(appPath + "\\tempzxc.txt");
+
+        }
+
+        private void READ_Click(object sender, EventArgs e)
+        {
+            char[] wrbuff = new char[10];
+            wrbuff[0] = 'r';
+            serialPort1.Write(wrbuff, 0, 1);
+            System.Threading.Thread.Sleep(10);
+
+            serialPort1.Write(System.Convert.ToString(StADDr.Text));
+
+            System.Threading.Thread.Sleep(10);
+            wrbuff[0] = System.Convert.ToChar(27);
+            serialPort1.Write(wrbuff, 0, 1);
+
+           /* serialPort1.Write(System.Convert.ToString(StopADDr.Text));
+            System.Threading.Thread.Sleep(10);
+
+            // wrbuff[0] = System.Convert.ToChar("8");
+            wrbuff[0] = System.Convert.ToChar(27);
+            serialPort1.Write(wrbuff, 0, 1);*/
+
+        }
+
+        private void SAVELOG_Click(object sender, EventArgs e)
+        {
+            LOGWriter.Close();
+
+            saveFileDialog1.FileName = "Log";
+            saveFileDialog1.Filter = "Text files (*.txt)|*.txt|All files (*.*)|*.*";
+            saveFileDialog1.ShowDialog();
+            string File_Name = saveFileDialog1.FileName;
+            System.IO.FileStream fs = (System.IO.FileStream)saveFileDialog1.OpenFile();
+            fs.Close();
+            file_flag = false;
+            StreamWriter writer = new StreamWriter(File_Name);
+            StreamReader reader = new StreamReader(appPath + "\\LOG_Temp.txt");
+
+            while (!reader.EndOfStream)
+            {
+                writer.WriteLine(reader.ReadLine());
+            }
+            writer.Close();
+            reader.Close();
+
+            LOGWriter.Dispose();
+            reader.Dispose();
+            // TempWriter.Finalize();
+            // if (System.IO.File.Exists(appPath+"\\temp.txt"))
+            //   System.IO.File.Delete(appPath+"\\temp.txt");
+            LOGWriter = null;
+            LOGWriter = new StreamWriter(appPath + "\\LOG_Temp.txt");
+
+        }
+
+        private void Connect1_Click(object sender, EventArgs e)
+        {
+            serialPort1.PortName = comboBox1.Text;
+            serialPort1.BaudRate = 115200;
+            serialPort1.StopBits = System.IO.Ports.StopBits.One;
+            try
+            {
+                serialPort1.Open();
+                // serialPort1.ReadTimeout = 5000;
+                serialPort1.DataReceived += new SerialDataReceivedEventHandler(Receive);
+                serialPort1.Parity = System.IO.Ports.Parity.None;
+                MessageBox.Show("COM Port Connected");
+                /* if (B1.Checked == true)
+                     serialPort1.BaudRate = 9600;
+                 else if (B2.Checked == true)
+                     serialPort1.BaudRate = 19200;
+                 else if (B3.Checked == true)
+                     serialPort1.BaudRate = 115200;
+
+                 if (S1.Checked == true)
+                     serialPort1.StopBits = System.IO.Ports.StopBits.One;
+
+                 else if (S2.Checked == true)
+                     serialPort1.StopBits = System.IO.Ports.StopBits.OnePointFive;
+
+                 else if (S3.Checked == true)
+                     serialPort1.StopBits = System.IO.Ports.StopBits.Two;
+
+                 if (P1.Checked == true)
+                     serialPort1.Parity = System.IO.Ports.Parity.Odd;
+
+                 else if (P2.Checked == true)
+                     serialPort1.Parity = System.IO.Ports.Parity.Even;
+
+                 else if (P3.Checked == true)
+                     serialPort1.Parity = System.IO.Ports.Parity.None;
+                  */
+            }
+            catch
+            {
+                MessageBox.Show("Can not Open Selected COM Port");
+            }
+
+        }
+
+        private void REC_BOX_TextChanged(object sender, EventArgs e)
+        {
+            REC_BOX.SelectionStart = REC_BOX.Text.Length; //Set the current caret position at the end
+            REC_BOX.ScrollToCaret();
+        }
+    }
+}
